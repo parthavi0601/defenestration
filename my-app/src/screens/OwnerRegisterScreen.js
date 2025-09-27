@@ -1,8 +1,10 @@
+// src/screens/OwnerRegisterScreen.js
 "use client"
 
 import { useState } from "react"
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, ScrollView, Alert } from "react-native"
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, ScrollView, Alert, ActivityIndicator } from "react-native"
 import { LinearGradient } from "expo-linear-gradient"
+import authService from '../services/authService'
 
 export default function OwnerRegisterScreen({ navigation }) {
   const [formData, setFormData] = useState({
@@ -13,6 +15,7 @@ export default function OwnerRegisterScreen({ navigation }) {
     password: "",
     mobileNumber: "",
   })
+  const [loading, setLoading] = useState(false)
 
   const handleInputChange = (field, value) => {
     setFormData((prev) => ({
@@ -21,7 +24,15 @@ export default function OwnerRegisterScreen({ navigation }) {
     }))
   }
 
-  const handleNext = () => {
+  const validateEmail = (email) => {
+    return /\S+@\S+\.\S+/.test(email)
+  }
+
+  const validatePhone = (phone) => {
+    return /^\+?[\d\s-()]{10,}$/.test(phone)
+  }
+
+  const handleNext = async () => {
     // Validate form
     const requiredFields = ["firstName", "lastName", "email", "username", "password", "mobileNumber"]
     const emptyFields = requiredFields.filter((field) => !formData[field].trim())
@@ -31,8 +42,44 @@ export default function OwnerRegisterScreen({ navigation }) {
       return
     }
 
-    // Navigate to shop setup
-    navigation.navigate("ShopSetup", { ownerData: formData })
+    if (!validateEmail(formData.email)) {
+      Alert.alert("Error", "Please enter a valid email address")
+      return
+    }
+
+    if (!validatePhone(formData.mobileNumber)) {
+      Alert.alert("Error", "Please enter a valid phone number")
+      return
+    }
+
+    if (formData.password.length < 6) {
+      Alert.alert("Error", "Password must be at least 6 characters long")
+      return
+    }
+
+    setLoading(true)
+    try {
+      const result = await authService.registerOwner({
+        first_name: formData.firstName,
+        last_name: formData.lastName,
+        email: formData.email,
+        username: formData.username,
+        password: formData.password,
+        mobile_number: formData.mobileNumber,
+      })
+
+      if (result.success) {
+        Alert.alert("Success", "Account created successfully!", [
+          { text: "OK", onPress: () => navigation.navigate("ShopSetup", { ownerData: result.data }) }
+        ])
+      } else {
+        Alert.alert("Registration Failed", result.error)
+      }
+    } catch (error) {
+      Alert.alert("Error", "An unexpected error occurred. Please try again.")
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -49,22 +96,24 @@ export default function OwnerRegisterScreen({ navigation }) {
               <View style={[styles.inputGroup, { flex: 1, marginRight: 8 }]}>
                 <Text style={styles.label}>First Name</Text>
                 <TextInput
-                  style={styles.input}
+                  style={[styles.input, loading && styles.inputDisabled]}
                   placeholder="Enter first name"
                   placeholderTextColor="#6b7280"
                   value={formData.firstName}
                   onChangeText={(value) => handleInputChange("firstName", value)}
+                  editable={!loading}
                 />
               </View>
 
               <View style={[styles.inputGroup, { flex: 1, marginLeft: 8 }]}>
                 <Text style={styles.label}>Last Name</Text>
                 <TextInput
-                  style={styles.input}
+                  style={[styles.input, loading && styles.inputDisabled]}
                   placeholder="Enter last name"
                   placeholderTextColor="#6b7280"
                   value={formData.lastName}
                   onChangeText={(value) => handleInputChange("lastName", value)}
+                  editable={!loading}
                 />
               </View>
             </View>
@@ -72,54 +121,67 @@ export default function OwnerRegisterScreen({ navigation }) {
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Email</Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, loading && styles.inputDisabled]}
                 placeholder="Enter your email"
                 placeholderTextColor="#6b7280"
                 value={formData.email}
                 onChangeText={(value) => handleInputChange("email", value)}
                 keyboardType="email-address"
                 autoCapitalize="none"
+                editable={!loading}
               />
             </View>
 
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Username</Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, loading && styles.inputDisabled]}
                 placeholder="Choose a username"
                 placeholderTextColor="#6b7280"
                 value={formData.username}
                 onChangeText={(value) => handleInputChange("username", value)}
                 autoCapitalize="none"
+                editable={!loading}
               />
             </View>
 
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Password</Text>
               <TextInput
-                style={styles.input}
-                placeholder="Create a password"
+                style={[styles.input, loading && styles.inputDisabled]}
+                placeholder="Create a password (min 6 characters)"
                 placeholderTextColor="#6b7280"
                 value={formData.password}
                 onChangeText={(value) => handleInputChange("password", value)}
                 secureTextEntry
+                editable={!loading}
               />
             </View>
 
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Mobile Number</Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, loading && styles.inputDisabled]}
                 placeholder="Enter your mobile number"
                 placeholderTextColor="#6b7280"
                 value={formData.mobileNumber}
                 onChangeText={(value) => handleInputChange("mobileNumber", value)}
                 keyboardType="phone-pad"
+                editable={!loading}
               />
             </View>
 
-            <TouchableOpacity style={styles.button} onPress={handleNext} activeOpacity={0.8}>
-              <Text style={styles.buttonText}>Next</Text>
+            <TouchableOpacity 
+              style={[styles.button, loading && styles.buttonDisabled]} 
+              onPress={handleNext} 
+              activeOpacity={0.8}
+              disabled={loading}
+            >
+              {loading ? (
+                <ActivityIndicator color="#ffffff" />
+              ) : (
+                <Text style={styles.buttonText}>Next</Text>
+              )}
             </TouchableOpacity>
           </View>
         </ScrollView>
@@ -179,6 +241,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#374151",
   },
+  inputDisabled: {
+    opacity: 0.6,
+  },
   button: {
     backgroundColor: "#6366f1",
     borderRadius: 12,
@@ -186,6 +251,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginTop: 16,
     marginBottom: 32,
+  },
+  buttonDisabled: {
+    backgroundColor: "#4338ca",
+    opacity: 0.6,
   },
   buttonText: {
     fontSize: 16,
